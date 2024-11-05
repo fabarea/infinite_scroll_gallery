@@ -35,38 +35,53 @@ class ImageStackViewHelper extends AbstractViewHelper
         $images = $this->templateVariableContainer->get('images');
 
         $items = [];
+
+        $processedUids = []; 
+        $items = [];
+
         foreach ($images as $image) {
-
             /** @var \TYPO3\CMS\Core\Resource\File $file */
-            $file = GeneralUtility::makeInstance(ResourceFactory::class)->getFileObject($image->getUid());
-            $thumbnailFile = $this->createProcessedFile($file, 'thumbnailMaximumWidth', 'thumbnailMaximumHeight');
-            $enlargedFile = $this->createProcessedFile($file, 'enlargedImageMaximumWidth', 'enlargedImageMaximumHeight');
+            if (!empty($image['uid']) && !in_array($image['uid'], $processedUids)) {
+                try {
+                    $file = GeneralUtility::makeInstance(ResourceFactory::class)->getFileObject($image['uid']);
+                    
+                    $thumbnailFile = $this->createProcessedFile($file, 'thumbnailMaximumWidth', 'thumbnailMaximumHeight');
+                    $enlargedFile = $this->createProcessedFile($file, 'enlargedImageMaximumWidth', 'enlargedImageMaximumHeight');
+                    $categories = [];
 
-            $categories = array_map(function ($cat) {
-                return [
-                    'id' => $cat['uid'],
-                    'title' => $cat['title']
-                ];
-            }, $image['metadata']['categories']);
+                    if (isset($image['metadata']['categories']) && is_array($image['metadata']['categories'])) {
+                        $categories = array_map(function ($cat) {
+                            return [
+                                'id' => $cat['uid'],
+                                'title' => $cat['title']
+                            ];
+                        }, $image['metadata']['categories']);
+                    }
 
-            $baseUrl = GeneralUtility::getIndpEnv('TYPO3_SITE_URL');
-            $item = [
-                'thumbnail' => $baseUrl . $thumbnailFile->getPublicUrl(),
-                'enlarged' => $baseUrl . $enlargedFile->getPublicUrl(),
-                'id' => $file->getProperty('uid'),
-                'title' => $file->getProperty('title'),
-                'description' => $file->getProperty('description'),
-                'tWidth' => $thumbnailFile->getProperty('width'),
-                'tHeight' => $thumbnailFile->getProperty('height'),
-                'eWidth' => $enlargedFile->getProperty('width'),
-                'eHeight' => $enlargedFile->getProperty('height'),
-                'categories' => $categories
-            ];
+                    $baseUrl = GeneralUtility::getIndpEnv('TYPO3_SITE_URL');
+                    $item = [
+                        'thumbnail' => $baseUrl . $thumbnailFile->getPublicUrl(),
+                        'enlarged' => $baseUrl . $enlargedFile->getPublicUrl(),
+                        'id' => $file->getProperty('uid'),
+                        'title' => $file->getProperty('title'),
+                        'description' => $file->getProperty('description'),
+                        'tWidth' => $thumbnailFile->getProperty('width'),
+                        'tHeight' => $thumbnailFile->getProperty('height'),
+                        'eWidth' => $enlargedFile->getProperty('width'),
+                        'eHeight' => $enlargedFile->getProperty('height'),
+                        'categories' => $categories
+                    ];
 
-            $items[] = $item;
+                    $items[] = $item; 
+                    $processedUids[] = $image['uid']; 
+                } catch (\TYPO3\CMS\Core\Resource\Exception\FileDoesNotExistException $e) {
+                    
+                }
+            }
         }
 
         return json_encode($items);
+
     }
 
     /**
